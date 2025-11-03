@@ -5,5 +5,4 @@ services:
     build: .
     ports:
       - "8000:5000"
-    volumes:
-      - ./data/data.json:/app/data.json
+    volumes: ./data/data.json:/app/data.json
