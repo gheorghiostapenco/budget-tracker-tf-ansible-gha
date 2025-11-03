@@ -1,0 +1,18 @@
+# Terraform State and Credentials
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+
+# Python / Environment
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Ansible (Optional secrets)
+*.retry
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Budget Tracker - Tailwind</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for transaction types */
+        .income {
+            color: #10B981; /* Tailwind green-500 */
+            font-weight: 600;
+        }
+        .expense {
+            color: #EF4444; /* Tailwind red-500 */
+        }
+        /* Style for the reset button */
+        #resetButton {
+            @apply bg-red-600 text-white font-bold py-2 px-4 rounded-md shadow-md hover:bg-red-700 transition-colors duration-200;
+        }
+        /* Style for the transaction list items */
+        .income-bg { background-color: #ECFDF5; } /* Tailwind green-50 */
+        .expense-bg { background-color: #FEF2F2; } /* Tailwind red-50 */
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal p-4">
+    <div class="container mx-auto bg-white shadow-lg rounded-lg p-6 max-w-2xl mt-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Minimal Budget Tracker</h1>
+        
+        <div class="mb-8 p-4 bg-blue-50 border-l-4 border-blue-400 rounded-lg shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <div class="md:col-span-2">
+                <h2 class="text-xl font-semibold text-gray-700 mb-3">Remaining Budget: 
+                    <span id="currentBudget" class="text-blue-600 text-2xl font-extrabold">$0.00</span>
+                </h2>
+                <h2 class="text-xl font-semibold text-gray-700">Monthly Limit: 
+                    <span id="monthlyBudgetLimit" class="text-purple-600 text-2xl font-extrabold">$0.00</span>
+                </h2>
+            </div>
+            
+            <div class="md:col-span-1 border-t md:border-t-0 md:border-l border-gray-300 pt-4 md:pt-0 md:pl-4">
+                <h3 class="text-lg font-medium text-gray-600 mb-2">Set Budget Limit</h3>
+                <form id="budgetForm">
+                    <input type="number" step="0.01" id="budgetAmount" name="amount" required 
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mb-2"
+                           placeholder="Limit Amount">
+                    <button type="submit" 
+                            class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded-md shadow-md focus:outline-none focus:shadow-outline transition-colors duration-200 w-full text-sm">
+                        Set Limit
+                    </button>
+                </form>
+            </div>
+            
+            <div class="md:col-span-3">
+                <hr class="my-4 border-gray-300">
+                <h3 class="text-lg font-medium text-gray-600 mb-2">Expense Statistics by Category:</h3>
+                <ul id="statsList" class="list-disc list-inside text-gray-700 grid grid-cols-2 md:grid-cols-4">
+                    </ul>
+            </div>
+        </div>
+        
+        <hr class="my-6 border-gray-300">
+        
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Add Transaction</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="md:col-span-1">
+                <label for="amount" class="block text-gray-700 text-sm font-bold mb-2">Amount:</label>
+                <input type="number" step="0.01" id="amount" name="amount" required 
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="e.g., 25.50">
+            </div>
+            
+            <div class="md:col-span-1">
+                <label for="category" class="block text-gray-700 text-sm font-bold mb-2">Category (Expense only):</label>
+                <select id="category" name="category" 
+                        class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <option value="Food">Food</option>
+                    <option value="Health">Health</option>
+                    <option value="Transportation">Transportation</option>
+                    <option value="Home">Home</option>
+                </select>
+            </div>
+            
+            <div class="md:col-span-2">
+                <label for="description" class="block text-gray-700 text-sm font-bold mb-2">Description:</label>
+                <input type="text" id="description" name="description"
+                       class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                       placeholder="Optional description">
+            </div>
+            
+            <div class="md:col-span-4 grid grid-cols-2 gap-4">
+                <button type="button" id="addExpenseBtn" 
+                        class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md shadow-md focus:outline-none focus:shadow-outline transition-colors duration-200 w-full">
+                    Add Expense
+                </button>
+                <button type="button" id="addIncomeBtn" 
+                        class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md shadow-md focus:outline-none focus:shadow-outline transition-colors duration-200 w-full">
+                    Add Income
+                </button>
+            </div>
+        </div>
+        
+        <hr class="my-6 border-gray-300">
+        
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Transaction History</h2>
+        <ul id="transactionsList" class="space-y-2">
+            </ul>
+        
+        <hr class="my-6 border-gray-300">
+        
+        <button id="resetButton" class="w-full">
+            Reset All Data
+        </button>
+    </div>
+
+    <script>
+        // API Endpoints
+        const API_URL = '/api/transactions';
+        const RESET_URL = '/api/reset';
+        const BUDGET_URL = '/api/budget';
+        const statsCategories = ["Food", "Health", "Transportation", "Home"];
+        
+        // --- Core Logic Functions (Fetch Data, Reset) ---
+
+        // Function to fetch all data and update the UI
+        async function fetchData() {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+            
+            // Update Remaining Budget and Limit displays
+            document.getElementById('currentBudget').textContent = `$${data.current_budget.toFixed(2)}`;
+            document.getElementById('monthlyBudgetLimit').textContent = `$${data.monthly_budget.toFixed(2)}`;
+            
+            // Render Transactions History
+            const transactionsList = document.getElementById('transactionsList');
+            transactionsList.innerHTML = ''; 
+            
+            data.transactions.forEach(t => {
+                const li = document.createElement('li');
+                const className = t.type; 
+                const categoryText = t.type === 'expense' ? `(${t.category})` : '';
+                // Use custom CSS classes defined in the <style> block
+                li.className = `p-3 rounded-md shadow-sm flex justify-between items-center ${className}-bg ${className}`;
+                li.innerHTML = `
+                    <span class="text-gray-800">${t.description} ${categoryText}</span>
+                    <span class="${className === 'income' ? 'text-green-600' : 'text-red-600'} font-semibold">$${t.amount.toFixed(2)}</span>
+                `;
+                transactionsList.prepend(li); // Show newest first
+            });
+
+            // Render Expense Statistics
+            const statsList = document.getElementById('statsList');
+            statsList.innerHTML = '';
+            statsCategories.forEach(cat => {
+                const amount = data.stats[cat] || 0.00; 
+                const li = document.createElement('li');
+                li.className = 'text-gray-700 mb-1';
+                li.textContent = `${cat}: $${amount.toFixed(2)}`;
+                statsList.appendChild(li);
+            });
+        }
+        
+        // --- Transaction Input Logic ---
+        
+        // Unified function to handle POST request
+        async function postTransaction(transactionData) {
+            if (transactionData.amount <= 0 || isNaN(transactionData.amount)) {
+                 alert('Amount must be a positive number.');
+                 return;
+            }
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(transactionData)
+            });
+            
+            if (response.ok) {
+                // Clear input fields after successful submission
+                document.getElementById('amount').value = '';
+                document.getElementById('description').value = '';
+                document.getElementById('category').value = 'Food'; // Reset category to default
+                fetchData(); 
+            } else {
+                alert('Error adding transaction.');
+            }
+        }
+
+        // Event listener for 'Add Expense' button
+        document.getElementById('addExpenseBtn').addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const description = document.getElementById('description').value || '';
+            const category = document.getElementById('category').value;
+            
+            const newTransaction = {
+                amount: amount,
+                type: 'expense', 
+                category: category,
+                description: description
+            };
+            postTransaction(newTransaction);
+        });
+
+        // Event listener for 'Add Income' button
+        document.getElementById('addIncomeBtn').addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('amount').value);
+            const description = document.getElementById('description').value || ''; 
+            const category = 'Income'; // Fixed category for income
+            
+            const newTransaction = {
+                amount: amount,
+                type: 'income', 
+                category: category,
+                description: description
+            };
+            postTransaction(newTransaction);
+        });
+        
+        // --- Other Form Handlers (Budget, Reset) ---
+
+        // Handle 'Set Budget Limit' form submission
+        document.getElementById('budgetForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const form = event.target;
+            const amountValue = parseFloat(form.amount.value);
+            
+            if (isNaN(amountValue) || amountValue < 0) {
+                alert('Please enter a valid positive budget amount.');
+                return;
+            }
+
+            const newBudget = {
+                amount: amountValue
+            };
+            
+            const response = await fetch(BUDGET_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newBudget)
+            });
+            
+            if (response.ok) {
+                form.reset();
+                fetchData(); 
+            } else {
+                alert('Error setting budget.');
+            }
+        });
+
+        // Handle 'Reset All Data' button click
+        document.getElementById('resetButton').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to reset ALL data? This action cannot be undone.')) {
+                const response = await fetch(RESET_URL, { method: 'POST' });
+                if (response.ok) {
+                    alert('Data successfully reset!');
+                    fetchData(); 
+                } else {
+                    alert('Error resetting data.');
+                }
+            }
+        });
+
+        // Initial data load on page load
+        fetchData();
+    </script>
+</body>
+</html>

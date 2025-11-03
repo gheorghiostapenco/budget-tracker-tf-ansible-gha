@@ -1,0 +1,9 @@
+version: "3.9"
+
+services:
+  budget_app:
+    build: .
+    ports:
+      - "8000:5000"
+    volumes:
+      - ./data/data.json:/app/data.json   # монтируем только data.json

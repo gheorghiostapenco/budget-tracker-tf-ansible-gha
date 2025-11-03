@@ -1,0 +1,95 @@
+name: Continuous Delivery (CD) - Budget Tracker App
+
+on:
+  push:
+    branches:
+      - main  # Trigger workflow on push to the main branch
+    paths:
+      # Only run if application code or Ansible configuration changes
+      - 'BudgetTracker/**' 
+      - 'ansible/**'
+
+jobs:
+  # ====================================================================
+  # JOB 1: BUILD & PUSH DOCKER IMAGE
+  # The goal is to build the image and push it to DockerHub with a unique tag (commit SHA).
+  # ====================================================================
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          # Use secrets for secure authentication to DockerHub
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          # Path to the Dockerfile (relative to the repository root)
+          context: ./BudgetTracker 
+          push: true
+          tags: |
+            # Use the commit SHA as the unique, immutable tag for versioning
+            gheorghi99/minimal-budget-tracker:${{ github.sha }} 
+            # Also tag as 'latest' for convenience
+            gheorghi99/minimal-budget-tracker:latest
+            
+  # ====================================================================
+  # JOB 2: DEPLOY VIA ANSIBLE
+  # This job connects to the Droplet and runs the Ansible playbook to pull the new image.
+  # ====================================================================
+  deploy-app:
+    needs: build-and-push # Waits for the image to be successfully pushed
+    runs-on: ubuntu-latest
+    
+    # ENVIRONMENT VARIABLES & SECRETS:
+    env:
+      # Droplet's Public IP address (replace with a Secret if the IP changes often)
+      DROPLET_IP: 64.225.24.134 
+      # The dynamic tag to be used by Ansible (passed to the playbook)
+      IMAGE_TAG: ${{ github.sha }}
+      
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      # --- 1. Setup SSH Agent ---
+      - name: Setup SSH Agent and Add Private Key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          # Use the repository secret containing the PRIVATE SSH key (added to DigitalOcean)
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }} 
+          
+      - name: Add Droplet Host Key to known_hosts
+        # This step retrieves the Droplet's host key and adds it to the runner's known_hosts
+        # to prevent "Host key verification failed" errors during SSH/Ansible connection.
+        run: ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      # --- 2. Setup Ansible ---
+      - name: Install Ansible and Collections
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          # Install Ansible itself
+          pip3 install ansible
+          # Install the Docker collection for Ansible
+          ansible-galaxy collection install community.docker
+
+      # --- 3. Run Deployment ---
+      - name: Create Dynamic Ansible Inventory
+        # Create a basic inventory file with the Droplet's current IP
+        run: |
+          echo "[webservers]" > ansible/inventory.ini
+          echo "${{ env.DROPLET_IP }} ansible_user=root" >> ansible/inventory.ini
+        
+      - name: Run Ansible Playbook (Deploy Updated Docker App)
+        # Execute the playbook, passing the dynamic image tag as an extra variable
+        run: ansible-playbook -i ansible/inventory.ini ansible/deploy_docker.yml -e "DOCKER_IMAGE_TAG=${{ env.IMAGE_TAG }}"
+        env:
+          # Disable host key checking, relying on the 'ssh-keyscan' step
+          ANSIBLE_HOST_KEY_CHECKING: no
