@@ -104,6 +104,20 @@ Install Docker, pull the latest image, and run container
 
 **💻 Local Usage**
 
+💻 **Local Run and Testing**
+
+
+To locally test the IaC and CM, follow these steps:
+
+Clone the repository:
+```bash
+
+https://github.com/gheorghiostapenco/budget-tracker-tf-ansible-gha.git
+
+cd your-repo-name
+
+```
+
 **Terraform**
 ```bash
 
