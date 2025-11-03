@@ -1,3 +1,36 @@
-*.tfstate
-*.tfstate.backup
-.terraform/
+# ==============================
+# Terraform
+# ==============================
+.terraform/                  # local Terraform provider files
+.terraform.lock.hcl          # Terraform lock file
+*.tfstate                    # Terraform state files
+*.tfstate.backup             # backup state files
+crash.log                    # Terraform crash logs
+
+# ==============================
+# Python / Environment
+# ==============================
+__pycache__/                 # Python cache directories
+*.pyc                         # compiled Python files
+venv/                         # virtual environment
+.env                           # secret environment variables
+
+# ==============================
+# Ansible
+# ==============================
+*.retry                        # failed playbook run files
+vault_pass.txt                 # local Ansible vault password file (if used)
+
+# ==============================
+# IDE / Editor
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==============================
+# Logs & Misc
+# ==============================
+*.log
+.DS_Store
