@@ -1,11 +1,12 @@
 # budget-tracker-tf-ansible-gha
 Budget Tracker application (using Terraform-Ansible-DigitalOcean and GitHub Actions)
-🌐 DevOps Portfolio: Automated Budget Tracker
+
+🌐 **DevOps Portfolio: Automated Budget Tracker**
 
 <img width="718" height="836" alt="image" src="https://github.com/user-attachments/assets/86eaae82-3da3-4f1f-83d4-1961d216c8e6" />
 
 
-🚀 Project Overview
+🚀 **Project Overview**
 
 This project showcases a fully automated solution for deploying a web application (a simple budget tracker) on DigitalOcean cloud infrastructure.
 
@@ -19,21 +20,9 @@ Containerization: Utilizing Docker for application portability.
 
 Continuous Integration and Continuous Deployment (CI/CD): Automating the entire process with GitHub Actions.
 
-CI/CD Pipeline Status
-
-Pipeline
-
-Status
-
-CI (Docker Image Build)
 
 
-
-CD (Infrastructure Deployment)
-
-
-
-🏗️ Solution Architecture
+🏗️ **Solution Architecture**
 
 The project utilizes the GitOps paradigm. Every merge to the main branch triggers an automatic deployment process.
 
@@ -49,7 +38,7 @@ Ansible Run: Ansible connects to the Droplet via SSH, installs necessary depende
 
 Deployment: The application becomes accessible via the Droplet's public IP address on port 80.
 
-🛠️ Technology Stack
+🛠️ **Technology Stack**
 
 Category
 
@@ -93,7 +82,7 @@ Docker Hub
 
 Storing the built Docker image.
 
-⚙️ Detailed CI/CD Pipeline Description (.github/workflows/main.yml)
+⚙️ **Detailed CI/CD Pipeline Description** (.github/workflows/main.yml)
 
 The pipeline is split into two sequential jobs, each demonstrating core competencies.
 
@@ -133,7 +122,7 @@ Installation of Docker Compose (via pip).
 
 Container Startup: Pulls the fresh image from Docker Hub and runs it, mapping the container's port 5000 to the host's public port 80.
 
-🔑 Secret Configuration (GitHub Secrets)
+🔑 **Secret Configuration (GitHub Secrets)**
 
 The following environment variables must be defined in your GitHub repository settings for the pipeline to run successfully:
 
@@ -167,17 +156,16 @@ Private SSH key for Droplet access. Critical for Ansible.
 
 Ansible
 
-💻 Local Run and Testing
-
+💻 **Local Run and Testing**
 To locally test the IaC and CM, follow these steps:
 
 Clone the Repository:
 
-git clone [https://github.com/YourUsername/your-repo-name.git](https://github.com/YourUsername/your-repo-name.git)
+git clone (https://github.com/gheorghiostapenco/budget-tracker-tf-ansible-gha))
 cd your-repo-name
 
 
-Terraform:
+**Terraform:**
 
 # Initialization
 terraform init
