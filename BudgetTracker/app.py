@@ -1,130 +1,106 @@
-from flask import Flask, render_template, request, jsonify
+import os
+from flask import Flask, render_template, request, jsonify, abort
 
 app = Flask(__name__)
-PORT = 5000
+PORT = int(os.environ.get('PORT', 5000))
 
-# Global in-memory data store. 
-# We only store base data: the list of transactions and the budget limit.
-# All derived metrics (Remaining Budget, Total Expenses, Stats) are calculated dynamically.
+# Data store
 data = {
     "transactions": [],
     "monthly_budget": 0.00
 }
-
-# Categories for expense tracking
 stats_categories = ["Food", "Health", "Transportation", "Home"]
 
 def calculate_current_state():
-    """
-    Calculates all derived state based on the base data in 'data'.
-    
-    CORRECTED LOGIC:
-    1. Total Expenses is calculated from all 'expense' transactions.
-    2. Total Income is calculated from all 'income' transactions.
-    3. Remaining Budget = Monthly Limit + Total Income - Total Expenses.
-    """
-    
     total_expenses = 0.00
-    # **FIX: Initialize total_income**
     total_income = 0.00
-    stats = {}
-    
-    # Initialize stats structure for accurate calculation
-    for cat in stats_categories:
-        stats[cat] = 0.00
+    stats = {cat: 0.00 for cat in stats_categories}
 
-    # Iterate through all transactions to calculate metrics
     for t in data["transactions"]:
         amount = t["amount"]
-        
         if t["type"] == 'expense':
-            total_expenses += amount # Summing up ALL expenses
-            
-            # Summing up expenses per category
-            if t["category"] in stats:
-                stats[t["category"]] += amount
-        
-        # **FIX: Add income to total_income**
+            total_expenses += amount
+            stats[t["category"]] += amount
         elif t["type"] == 'income':
-            total_income += amount # Summing up ALL income
+            total_income += amount
 
-    # **CRITICAL FIX: Remaining Budget = Monthly Limit + Total Income - Total Expenses**
     remaining_budget = data["monthly_budget"] + total_income - total_expenses
     
-    # Return the full state expected by the frontend
     return {
-        "current_budget": remaining_budget, # This key is used by the frontend for 'Remaining Budget'
+        "current_budget": remaining_budget,
         "monthly_budget": data["monthly_budget"],
         "transactions": data["transactions"],
         "stats": stats,
         "total_expenses": total_expenses,
-        # **Adding total_income for completeness, though not strictly required for the fix**
         "total_income": total_income
     }
 
-# Route to serve the main web interface
 @app.route('/')
 def index():
-    """Renders the main HTML page for the budget tracker."""
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        app.logger.error(f"Template error: {str(e)}")
+        abort(500, description="Internal server error: Template not found")
 
-# API for transactions (GET: retrieve data, POST: add transaction)
 @app.route('/api/transactions', methods=['GET', 'POST'])
 def transactions_api():
     global data
     if request.method == 'GET':
-        # Return dynamically calculated state
         return jsonify(calculate_current_state()), 200
     
     elif request.method == 'POST':
+        if not isinstance(request.json, dict):
+            return jsonify({"error": "Request body must be JSON object"}), 400
+        new_transaction = request.json
+        amount = new_transaction.get('amount')
+        trans_type = new_transaction.get('type', 'expense')
+        category = new_transaction.get('category', 'N/A')
+        description = new_transaction.get('description', '')
+
         try:
-            new_transaction = request.json
-            amount = float(new_transaction.get('amount', 0))
-            trans_type = new_transaction.get('type', 'expense')
-            category = new_transaction.get('category', 'N/A')
-            description = new_transaction.get('description', '')
+            amount = float(amount)
+            if amount <= 0:
+                return jsonify({"error": "Amount must be positive"}), 400
+        except (TypeError, ValueError):
+            return jsonify({"error": "Amount must be a number"}), 400
 
-            # Only append the new transaction record to the base data list.
-            # No arithmetic operation is performed here.
-            data["transactions"].append({
-                "amount": amount,
-                "type": trans_type,
-                "category": category,
-                "description": description
-            })
+        if trans_type not in ['expense', 'income']:
+            return jsonify({"error": "Type must be 'expense' or 'income'"}), 400
+        if trans_type == 'expense' and category not in stats_categories:
+            return jsonify({"error": f"Category must be one of {stats_categories}"}), 400
 
-            return jsonify({"message": "Transaction added successfully"}), 201
+        data["transactions"].append({
+            "amount": amount,
+            "type": trans_type,
+            "category": category,
+            "description": description
+        })
+        app.logger.info(f"Added transaction: {trans_type}, {amount}, {category}")
+        return jsonify({"message": "Transaction added successfully"}), 201
 
-        except Exception as e:
-            return jsonify({"error": f"Invalid transaction data: {str(e)}"}), 400
-
-# API Route: Set the monthly budget limit
 @app.route('/api/budget', methods=['POST'])
 def set_monthly_budget():
     global data
+    if not isinstance(request.json, dict):
+        return jsonify({"error": "Request body must be JSON object"}), 400
     try:
-        req_data = request.json
-        new_budget = float(req_data.get('amount', 0.00))
-        
-        # Update the base monthly budget limit
+        new_budget = float(request.json.get('amount'))
+        if new_budget < 0:
+            return jsonify({"error": "Budget amount cannot be negative"}), 400
         data['monthly_budget'] = new_budget
-        
-        # Return the new state
+        app.logger.info(f"Set monthly budget: {new_budget}")
         return jsonify(calculate_current_state()), 200
-    except Exception as e:
-        return jsonify({"error": f"Invalid budget amount: {str(e)}"}), 400
+    except (TypeError, ValueError):
+        return jsonify({"error": "Budget amount must be a number"}), 400
 
-# API Route: Reset all in-memory data
 @app.route('/api/reset', methods=['POST'])
 def reset_api():
     global data
-    # Reset only base data
     data["transactions"] = []
     data["monthly_budget"] = 0.00
-    
+    app.logger.info("Data reset performed")
     return jsonify({"message": "All data reset successfully"}), 200
 
-# Run the application
 if __name__ == '__main__':
-    # Host '0.0.0.0' is necessary for Docker container accessibility
-    app.run(host='0.0.0.0', port=PORT, debug=True)
+    app.run(host='0.0.0.0', port=PORT, debug=os.environ.get('FLASK_DEBUG', 'False') == 'True')
