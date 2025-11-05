@@ -7,6 +7,7 @@ on:
     paths:
       - 'BudgetTracker/**'
       - 'ansible/**'
+  workflow_dispatch:  # Adds manual trigger support
 
 permissions:
   contents: read
@@ -14,17 +15,14 @@ permissions:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Docker Login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build & Push Docker Image
         uses: docker/build-push-action@v5
         with:
@@ -37,20 +35,17 @@ jobs:
   deploy-app:
     needs: build-and-push
     runs-on: ubuntu-latest
-
     env:
       DROPLET_IP: 64.225.24.134
       IMAGE_TAG: ${{ github.sha }}
-
+      ANSIBLE_HOST_KEY_CHECKING: false  # Aligns with deploy_docker.yml
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
       - name: Cache pip packages
         uses: actions/cache@v3
         with:
@@ -58,23 +53,20 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-
       - name: Install Ansible
-        uses: ansible/ansible-setup-action@v1
-
+        run: pip install ansible  # Replaced ansible/ansible-setup-action@v1
       - name: Install Ansible Docker Collection
         run: ansible-galaxy collection install community.docker
-
       - name: Start SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
       - name: Add Droplet Host Key
         run: ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
-
       - name: Create Dynamic Inventory
         run: |
           mkdir -p ansible
-          echo "[webservers]" > ansible/inventory.ini ἐ
-
+          echo "[webservers]" > ansible/inventory.ini
+          echo "${{ env.DROPLET_IP }} ansible_user=root" >> ansible/inventory.ini
+      - name: Run Ansible Playbook
+        run: ansible-playbook -i ansible/inventory.ini ansible/deploy_docker.yml -e "DOCKER_IMAGE_TAG=${{ env.IMAGE_TAG }}"
