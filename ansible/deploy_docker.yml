@@ -60,7 +60,8 @@
         name: docker
         executable: pip3
 
-    - name: Pull Docker image (Tag: {{ DOCKER_IMAGE_TAG }})
+    # CRITICAL FIX: Quote the 'name' field that contains the variable!
+    - name: "Pull Docker image (Tag: {{ DOCKER_IMAGE_TAG }})" 
       community.docker.docker_image:
         # Use the correctly templated variable
         name: "{{ DOCKER_IMAGE_NAME }}"
