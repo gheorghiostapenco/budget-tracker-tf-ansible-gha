@@ -18,13 +18,15 @@ def calculate_current_state():
     """
     Calculates all derived state based on the base data in 'data'.
     
-    NEW LOGIC:
+    CORRECTED LOGIC:
     1. Total Expenses is calculated from all 'expense' transactions.
-    2. Remaining Budget = Monthly Limit - Total Expenses.
-    3. Income does NOT affect Remaining Budget, but is tracked in transactions history.
+    2. Total Income is calculated from all 'income' transactions.
+    3. Remaining Budget = Monthly Limit + Total Income - Total Expenses.
     """
     
     total_expenses = 0.00
+    # **FIX: Initialize total_income**
+    total_income = 0.00
     stats = {}
     
     # Initialize stats structure for accurate calculation
@@ -33,18 +35,21 @@ def calculate_current_state():
 
     # Iterate through all transactions to calculate metrics
     for t in data["transactions"]:
+        amount = t["amount"]
+        
         if t["type"] == 'expense':
-            amount = t["amount"]
             total_expenses += amount # Summing up ALL expenses
             
             # Summing up expenses per category
             if t["category"] in stats:
                 stats[t["category"]] += amount
         
-        # Income transactions are completely ignored for budget calculation
+        # **FIX: Add income to total_income**
+        elif t["type"] == 'income':
+            total_income += amount # Summing up ALL income
 
-    # CRITICAL CALCULATION: Remaining Budget = Monthly Limit - Total Expenses
-    remaining_budget = data["monthly_budget"] - total_expenses
+    # **CRITICAL FIX: Remaining Budget = Monthly Limit + Total Income - Total Expenses**
+    remaining_budget = data["monthly_budget"] + total_income - total_expenses
     
     # Return the full state expected by the frontend
     return {
@@ -52,7 +57,9 @@ def calculate_current_state():
         "monthly_budget": data["monthly_budget"],
         "transactions": data["transactions"],
         "stats": stats,
-        "total_expenses": total_expenses
+        "total_expenses": total_expenses,
+        # **Adding total_income for completeness, though not strictly required for the fix**
+        "total_income": total_income
     }
 
 # Route to serve the main web interface
