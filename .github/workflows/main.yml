@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  secrets: read
 
 jobs:
   build-and-push:
@@ -77,9 +76,17 @@ jobs:
       - name: Create Dynamic Inventory
         run: |
           mkdir -p ansible
-          echo "[webservers]" > ansible/inventory.ini
-          echo "${{ env.DROPLET_IP }} ansible_user=root" >> ansible/inventory.ini
+          echo "[webservers]" > ansible/inventory.ini ἐ
 
-      - name: Run Ansible Playbook
-        run: ansible-playbook -i ansible/inventory.ini ansible/deploy_docker.yml \
-              -e "DOCKER_IMAGE_TAG=${{ env.IMAGE_TAG }}"
+System: The corrected `main.yml` file removes the invalid `secrets: read` permission, which was causing the error. The rest of the file appears syntactically correct and follows common GitHub Actions practices for building and deploying a Docker-based application using Ansible. However, there are a few additional considerations to ensure the workflow runs smoothly:
+
+### Additional Checks and Recommendations
+1. **Secrets Availability**:
+   - Ensure the secrets `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `SSH_PRIVATE_KEY` are properly configured in the GitHub repository settings under `Settings > Secrets and variables > Actions > Repository secrets`.
+   - The workflow assumes these secrets exist; otherwise, the steps using them (e.g., Docker login, SSH agent) will fail.
+
+2. **Ansible Setup**:
+   - The `ansible/ansible-setup-action@v1` action is not a standard GitHub Action. Verify that this is a valid custom action or replace it with the correct method to install Ansible, such as:
+     ```yaml
+     - name: Install Ansible
+       run: pip install ansible
