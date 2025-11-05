@@ -161,8 +161,6 @@ GitOps deployment workflow
 
 DigitalOcean cloud administration
 
-**📄 License**
 
-MIT License — free to use and adapt.
 
 
