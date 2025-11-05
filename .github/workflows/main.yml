@@ -78,14 +78,3 @@ jobs:
           mkdir -p ansible
           echo "[webservers]" > ansible/inventory.ini ἐ
 
-
-### Additional Checks and Recommendations
-1. **Secrets Availability**:
-   - Ensure the secrets `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, and `SSH_PRIVATE_KEY` are properly configured in the GitHub repository settings under `Settings > Secrets and variables > Actions > Repository secrets`.
-   - The workflow assumes these secrets exist; otherwise, the steps using them (e.g., Docker login, SSH agent) will fail.
-
-2. **Ansible Setup**:
-   - The `ansible/ansible-setup-action@v1` action is not a standard GitHub Action. Verify that this is a valid custom action or replace it with the correct method to install Ansible, such as:
-     ```yaml
-     - name: Install Ansible
-       run: pip install ansible
