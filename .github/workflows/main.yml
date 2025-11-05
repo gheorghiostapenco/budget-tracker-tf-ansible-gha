@@ -9,10 +9,14 @@ on:
       - 'BudgetTracker/**' 
       - 'ansible/**'
 
+# ⚠️ FIX: Add the permissions block to ensure secrets are accessible to the job
+permissions:
+  contents: read
+  secrets: read # <--- CRITICAL FIX: Ensures DOCKERHUB_USERNAME and DOCKERHUB_TOKEN can be read
+
 jobs:
   # ====================================================================
   # JOB 1: BUILD & PUSH DOCKER IMAGE
-  # The goal is to build the image and push it to DockerHub with a unique tag (commit SHA).
   # ====================================================================
   build-and-push:
     runs-on: ubuntu-latest
@@ -41,7 +45,6 @@ jobs:
             
   # ====================================================================
   # JOB 2: DEPLOY VIA ANSIBLE
-  # This job connects to the Droplet and runs the Ansible playbook to pull the new image.
   # ====================================================================
   deploy-app:
     needs: build-and-push # Waits for the image to be successfully pushed
@@ -53,6 +56,8 @@ jobs:
       DROPLET_IP: 64.225.24.134 
       # The dynamic tag to be used by Ansible (passed to the playbook)
       IMAGE_TAG: ${{ github.sha }}
+      # Set the host key checking environment variable globally for the job
+      ANSIBLE_HOST_KEY_CHECKING: no
       
     steps:
       - name: Checkout Repository
@@ -66,8 +71,6 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }} 
           
       - name: Add Droplet Host Key to known_hosts
-        # This step retrieves the Droplet's host key and adds it to the runner's known_hosts
-        # to prevent "Host key verification failed" errors during SSH/Ansible connection.
         run: ssh-keyscan -H ${{ env.DROPLET_IP }} >> ~/.ssh/known_hosts
 
       # --- 2. Setup Ansible ---
@@ -75,14 +78,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-pip
-          # Install Ansible itself
           pip3 install ansible
-          # Install the Docker collection for Ansible
           ansible-galaxy collection install community.docker
 
       # --- 3. Run Deployment ---
       - name: Create Dynamic Ansible Inventory
-        # Create a basic inventory file with the Droplet's current IP
         run: |
           echo "[webservers]" > ansible/inventory.ini
           echo "${{ env.DROPLET_IP }} ansible_user=root" >> ansible/inventory.ini
@@ -90,6 +90,5 @@ jobs:
       - name: Run Ansible Playbook (Deploy Updated Docker App)
         # Execute the playbook, passing the dynamic image tag as an extra variable
         run: ansible-playbook -i ansible/inventory.ini ansible/deploy_docker.yml -e "DOCKER_IMAGE_TAG=${{ env.IMAGE_TAG }}"
-        env:
-          # Disable host key checking, relying on the 'ssh-keyscan' step
-          ANSIBLE_HOST_KEY_CHECKING: no
+        # ⚠️ NOTE: Removed the redundant 'ANSIBLE_HOST_KEY_CHECKING: no' env line here, 
+        # as it is now set globally in the 'env' section for the job.
