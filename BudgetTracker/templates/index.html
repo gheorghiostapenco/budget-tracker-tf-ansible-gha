@@ -54,9 +54,18 @@
             
             <div class="md:col-span-3">
                 <hr class="my-4 border-gray-300">
-                <h3 class="text-lg font-medium text-gray-600 mb-2">Expense Statistics by Category:</h3>
-                <ul id="statsList" class="list-disc list-inside text-gray-700 grid grid-cols-2 md:grid-cols-4">
-                    </ul>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-600 mb-2">Expense Statistics:</h3>
+                        <ul id="expenseStatsList" class="list-disc list-inside text-gray-700">
+                            </ul>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-medium text-green-600 mb-2">Income Statistics:</h3>
+                        <ul id="incomeStatsList" class="list-disc list-inside text-gray-700">
+                            </ul>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -73,13 +82,14 @@
             </div>
             
             <div class="md:col-span-1">
-                <label for="category" class="block text-gray-700 text-sm font-bold mb-2">Category (Expense only):</label>
+                <label for="category" class="block text-gray-700 text-sm font-bold mb-2">Category (Expense):</label>
                 <select id="category" name="category" 
                         class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                     <option value="Food">Food</option>
                     <option value="Health">Health</option>
                     <option value="Transportation">Transportation</option>
                     <option value="Home">Home</option>
+                    <option value="Other">Other</option>
                 </select>
             </div>
             
@@ -120,13 +130,20 @@
         const API_URL = '/api/transactions';
         const RESET_URL = '/api/reset';
         const BUDGET_URL = '/api/budget';
-        const statsCategories = ["Food", "Health", "Transportation", "Home"];
+        
+        // --- FIX: Updated category lists to match backend (app.py) ---
+        const expenseCategories = ["Food", "Health", "Transportation", "Home", "Other"];
+        const incomeCategories = ["Salary", "Freelance", "Other"];
         
         // --- Core Logic Functions (Fetch Data, Reset) ---
 
         // Function to fetch all data and update the UI
         async function fetchData() {
             const response = await fetch(API_URL);
+            if (!response.ok) {
+                alert("Error fetching data from server.");
+                return;
+            }
             const data = await response.json();
             
             // Update Remaining Budget and Limit displays
@@ -137,28 +154,49 @@
             const transactionsList = document.getElementById('transactionsList');
             transactionsList.innerHTML = ''; 
             
-            data.transactions.forEach(t => {
+            // Reverse transactions to show newest first
+            data.transactions.slice().reverse().forEach(t => {
                 const li = document.createElement('li');
                 const className = t.type; 
-                const categoryText = t.type === 'expense' ? `(${t.category})` : '';
-                // Use custom CSS classes defined in the <style> block
+                // Show category for both types, default to 'Other' if missing
+                const categoryText = `(${t.category || 'Other'})`;
+                
                 li.className = `p-3 rounded-md shadow-sm flex justify-between items-center ${className}-bg ${className}`;
                 li.innerHTML = `
-                    <span class="text-gray-800">${t.description} ${categoryText}</span>
+                    <span class="text-gray-800">${t.description || 'Transaction'} ${categoryText}</span>
                     <span class="${className === 'income' ? 'text-green-600' : 'text-red-600'} font-semibold">$${t.amount.toFixed(2)}</span>
                 `;
-                transactionsList.prepend(li); // Show newest first
+                transactionsList.appendChild(li); // Append to show newest first (since we reversed)
             });
 
+            // --- FIX: Updated Statistics Rendering ---
+
             // Render Expense Statistics
-            const statsList = document.getElementById('statsList');
-            statsList.innerHTML = '';
-            statsCategories.forEach(cat => {
-                const amount = data.stats[cat] || 0.00; 
-                const li = document.createElement('li');
-                li.className = 'text-gray-700 mb-1';
-                li.textContent = `${cat}: $${amount.toFixed(2)}`;
-                statsList.appendChild(li);
+            const expenseStatsList = document.getElementById('expenseStatsList');
+            expenseStatsList.innerHTML = '';
+            expenseCategories.forEach(cat => {
+                // Read from data.expense_stats (not data.stats)
+                const amount = data.expense_stats[cat] || 0.00; 
+                if (amount > 0) { // Only show categories with spending
+                    const li = document.createElement('li');
+                    li.className = 'text-gray-700 mb-1';
+                    li.textContent = `${cat}: $${amount.toFixed(2)}`;
+                    expenseStatsList.appendChild(li);
+                }
+            });
+
+            // Render Income Statistics
+            const incomeStatsList = document.getElementById('incomeStatsList');
+            incomeStatsList.innerHTML = '';
+            incomeCategories.forEach(cat => {
+                // Read from data.income_stats
+                const amount = data.income_stats[cat] || 0.00;
+                if (amount > 0) { // Only show categories with income
+                    const li = document.createElement('li');
+                    li.className = 'text-gray-700 mb-1';
+                    li.textContent = `${cat}: $${amount.toFixed(2)}`;
+                    incomeStatsList.appendChild(li);
+                }
             });
         }
         
@@ -184,14 +222,16 @@
                 document.getElementById('category').value = 'Food'; // Reset category to default
                 fetchData(); 
             } else {
-                alert('Error adding transaction.');
+                // Provide more specific error from backend
+                const errorData = await response.json();
+                alert(`Error adding transaction: ${errorData.error}`);
             }
         }
 
         // Event listener for 'Add Expense' button
         document.getElementById('addExpenseBtn').addEventListener('click', () => {
             const amount = parseFloat(document.getElementById('amount').value);
-            const description = document.getElementById('description').value || '';
+            const description = document.getElementById('description').value || 'Expense';
             const category = document.getElementById('category').value;
             
             const newTransaction = {
@@ -206,8 +246,13 @@
         // Event listener for 'Add Income' button
         document.getElementById('addIncomeBtn').addEventListener('click', () => {
             const amount = parseFloat(document.getElementById('amount').value);
-            const description = document.getElementById('description').value || ''; 
-            const category = 'Income'; // Fixed category for income
+            const description = document.getElementById('description').value || 'Income'; 
+            
+            // FIX: Send a valid default category.
+            // Your backend is smart and defaults unknown income categories to "Other",
+            // but it's good practice to send a valid one from the frontend.
+            // Since there's no income category dropdown, we'll default to "Other".
+            const category = 'Other';
             
             const newTransaction = {
                 amount: amount,
@@ -228,7 +273,7 @@
             const amountValue = parseFloat(form.amount.value);
             
             if (isNaN(amountValue) || amountValue < 0) {
-                alert('Please enter a valid positive budget amount.');
+                alert('Please enter a valid non-negative budget amount.');
                 return;
             }
 
@@ -246,7 +291,8 @@
                 form.reset();
                 fetchData(); 
             } else {
-                alert('Error setting budget.');
+                const errorData = await response.json();
+                alert(`Error setting budget: ${errorData.error}`);
             }
         });
 
