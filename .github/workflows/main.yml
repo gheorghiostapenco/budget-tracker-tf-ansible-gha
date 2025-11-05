@@ -78,7 +78,6 @@ jobs:
           mkdir -p ansible
           echo "[webservers]" > ansible/inventory.ini ἐ
 
-System: The corrected `main.yml` file removes the invalid `secrets: read` permission, which was causing the error. The rest of the file appears syntactically correct and follows common GitHub Actions practices for building and deploying a Docker-based application using Ansible. However, there are a few additional considerations to ensure the workflow runs smoothly:
 
 ### Additional Checks and Recommendations
 1. **Secrets Availability**:
