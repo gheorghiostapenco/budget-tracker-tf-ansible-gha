@@ -28,4 +28,4 @@ EXPOSE 5000
 # -w 4: 4 worker processes (a good starting point for a 1-4 core machine)
 # -b 0.0.0.0:5000: Binds Gunicorn to all interfaces on port 5000
 # app:app: Specifies the Flask application instance (variable 'app' in file 'app.py')
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "app:app"]
