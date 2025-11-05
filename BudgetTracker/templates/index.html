@@ -125,40 +125,34 @@
         </button>
     </div>
 
-    <script>
+<script>
         // API Endpoints
         const API_URL = '/api/transactions';
         const RESET_URL = '/api/reset';
         const BUDGET_URL = '/api/budget';
         
-        // --- FIX: Updated category lists to match backend (app.py) ---
+        // Category lists (must match backend)
         const expenseCategories = ["Food", "Health", "Transportation", "Home", "Other"];
         const incomeCategories = ["Salary", "Freelance", "Other"];
         
-        // --- Core Logic Functions (Fetch Data, Reset) ---
+        // --- Core Logic Functions ---
 
-        // Function to fetch all data and update the UI
-        async function fetchData() {
-            const response = await fetch(API_URL);
-            if (!response.ok) {
-                alert("Error fetching data from server.");
-                return;
-            }
-            const data = await response.json();
-            
-            // Update Remaining Budget and Limit displays
+        // ---------------------------------------------------------------------
+        // FIX 1: Create a dedicated function to update all UI elements
+        // This function will be called by *all* other functions that get new data.
+        // ---------------------------------------------------------------------
+        function updateUI(data) {
+            // 1. Update Remaining Budget and Limit displays
             document.getElementById('currentBudget').textContent = `$${data.current_budget.toFixed(2)}`;
             document.getElementById('monthlyBudgetLimit').textContent = `$${data.monthly_budget.toFixed(2)}`;
             
-            // Render Transactions History
+            // 2. Render Transactions History
             const transactionsList = document.getElementById('transactionsList');
             transactionsList.innerHTML = ''; 
             
-            // Reverse transactions to show newest first
             data.transactions.slice().reverse().forEach(t => {
                 const li = document.createElement('li');
                 const className = t.type; 
-                // Show category for both types, default to 'Other' if missing
                 const categoryText = `(${t.category || 'Other'})`;
                 
                 li.className = `p-3 rounded-md shadow-sm flex justify-between items-center ${className}-bg ${className}`;
@@ -166,18 +160,15 @@
                     <span class="text-gray-800">${t.description || 'Transaction'} ${categoryText}</span>
                     <span class="${className === 'income' ? 'text-green-600' : 'text-red-600'} font-semibold">$${t.amount.toFixed(2)}</span>
                 `;
-                transactionsList.appendChild(li); // Append to show newest first (since we reversed)
+                transactionsList.appendChild(li);
             });
 
-            // --- FIX: Updated Statistics Rendering ---
-
-            // Render Expense Statistics
+            // 3. Render Expense Statistics
             const expenseStatsList = document.getElementById('expenseStatsList');
             expenseStatsList.innerHTML = '';
             expenseCategories.forEach(cat => {
-                // Read from data.expense_stats (not data.stats)
                 const amount = data.expense_stats[cat] || 0.00; 
-                if (amount > 0) { // Only show categories with spending
+                if (amount > 0) {
                     const li = document.createElement('li');
                     li.className = 'text-gray-700 mb-1';
                     li.textContent = `${cat}: $${amount.toFixed(2)}`;
@@ -185,13 +176,12 @@
                 }
             });
 
-            // Render Income Statistics
+            // 4. Render Income Statistics
             const incomeStatsList = document.getElementById('incomeStatsList');
             incomeStatsList.innerHTML = '';
             incomeCategories.forEach(cat => {
-                // Read from data.income_stats
                 const amount = data.income_stats[cat] || 0.00;
-                if (amount > 0) { // Only show categories with income
+                if (amount > 0) {
                     const li = document.createElement('li');
                     li.className = 'text-gray-700 mb-1';
                     li.textContent = `${cat}: $${amount.toFixed(2)}`;
@@ -200,9 +190,28 @@
             });
         }
         
+        // ---------------------------------------------------------------------
+        // FIX 2: Refactor fetchData() to only fetch and call updateUI()
+        // ---------------------------------------------------------------------
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) {
+                    throw new Error("Server error while fetching data.");
+                }
+                const data = await response.json();
+                updateUI(data); // Call the new UI update function
+            } catch (error) {
+                console.error("fetchData error:", error);
+                alert("Error fetching data from server.");
+            }
+        }
+        
         // --- Transaction Input Logic ---
         
-        // Unified function to handle POST request
+        // This function is correct. It POSTs data and then calls fetchData()
+        // to get the new state, which is required because the POST response
+        // for transactions does not include the full state.
         async function postTransaction(transactionData) {
             if (transactionData.amount <= 0 || isNaN(transactionData.amount)) {
                  alert('Amount must be a positive number.');
@@ -216,56 +225,48 @@
             });
             
             if (response.ok) {
-                // Clear input fields after successful submission
                 document.getElementById('amount').value = '';
                 document.getElementById('description').value = '';
-                document.getElementById('category').value = 'Food'; // Reset category to default
-                fetchData(); 
+                document.getElementById('category').value = 'Food';
+                fetchData(); // This is correct: get the new state
             } else {
-                // Provide more specific error from backend
                 const errorData = await response.json();
                 alert(`Error adding transaction: ${errorData.error}`);
             }
         }
 
-        // Event listener for 'Add Expense' button
+        // Add Expense Button
         document.getElementById('addExpenseBtn').addEventListener('click', () => {
             const amount = parseFloat(document.getElementById('amount').value);
             const description = document.getElementById('description').value || 'Expense';
             const category = document.getElementById('category').value;
             
             const newTransaction = {
-                amount: amount,
-                type: 'expense', 
-                category: category,
-                description: description
+                amount: amount, type: 'expense', 
+                category: category, description: description
             };
             postTransaction(newTransaction);
         });
 
-        // Event listener for 'Add Income' button
+        // Add Income Button
         document.getElementById('addIncomeBtn').addEventListener('click', () => {
             const amount = parseFloat(document.getElementById('amount').value);
             const description = document.getElementById('description').value || 'Income'; 
-            
-            // FIX: Send a valid default category.
-            // Your backend is smart and defaults unknown income categories to "Other",
-            // but it's good practice to send a valid one from the frontend.
-            // Since there's no income category dropdown, we'll default to "Other".
-            const category = 'Other';
+            const category = 'Other'; // Default to 'Other'
             
             const newTransaction = {
-                amount: amount,
-                type: 'income', 
-                category: category,
-                description: description
+                amount: amount, type: 'income', 
+                category: category, description: description
             };
             postTransaction(newTransaction);
         });
         
         // --- Other Form Handlers (Budget, Reset) ---
 
-        // Handle 'Set Budget Limit' form submission
+        // ---------------------------------------------------------------------
+        // FIX 3: Refactor budgetForm handler to use the data from its
+        // *own response* instead of calling fetchData().
+        // ---------------------------------------------------------------------
         document.getElementById('budgetForm').addEventListener('submit', async (event) => {
             event.preventDefault();
             
@@ -277,32 +278,38 @@
                 return;
             }
 
-            const newBudget = {
-                amount: amountValue
-            };
+            const newBudget = { amount: amountValue };
             
-            const response = await fetch(BUDGET_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newBudget)
-            });
-            
-            if (response.ok) {
-                form.reset();
-                fetchData(); 
-            } else {
-                const errorData = await response.json();
-                alert(`Error setting budget: ${errorData.error}`);
+            try {
+                const response = await fetch(BUDGET_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newBudget)
+                });
+                
+                if (response.ok) {
+                    form.reset();
+                    // Get the new state *directly* from the POST response
+                    const data = await response.json(); 
+                    // Call the UI update function with the fresh data
+                    updateUI(data); 
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error setting budget: ${errorData.error}`);
+                }
+            } catch (error) {
+                console.error("setBudget error:", error);
+                alert("Error setting budget.");
             }
         });
 
-        // Handle 'Reset All Data' button click
+        // Reset Button
         document.getElementById('resetButton').addEventListener('click', async () => {
             if (confirm('Are you sure you want to reset ALL data? This action cannot be undone.')) {
                 const response = await fetch(RESET_URL, { method: 'POST' });
                 if (response.ok) {
                     alert('Data successfully reset!');
-                    fetchData(); 
+                    fetchData(); // Correct: get the new (empty) state
                 } else {
                     alert('Error resetting data.');
                 }
